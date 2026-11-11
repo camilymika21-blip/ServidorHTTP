@@ -1,73 +1,109 @@
+#define _DEFAULT_SOURCE
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
-#include <err.h>
 #include <string.h>
-#include <netdb.h>
-#include <netinet/in.h>
 #include <unistd.h>
-#include <sys/epoll.h>
 
-struct addrinfo hints, *res, *res0;
-int error;
-int s;
-const char *cause = NULL;
+#define BUF_SIZE 4096
+#define BACKLOG  128
 
-
-getaddrinfo(const char *hostname, const char *servname, const struct addrinfo *hints, struct addrinfo **res);
-
-int listen(AF_INET, SOCK_STREAM, protocol);
-if (listen < 0){
-    fprintf(stderr, "ERROR EN LISTEN");
-    return -1;
-}
-
-if (bind(listen,(struct sockaddr*)&sevr_addr, sizeof(sevr_addr))!=0){
-    fprintf(stderr, "Error al asignar puerto asociado")
-}
-
-
-
-int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-
-int main (int argc, char*argv[])
+static int crear_socket_escucha(const char *puerto)
 {
-    struct addrinfo hints, *res, *p;
-    int status;
-    char ipstr[INET6_ADDRSTRLEN];
+    struct addrinfo hints, *result, *rp;
+    int sfd = -1, s, opt = 1;
 
-    if (arg != 2){
-        fprintf(stderr,"Hostname");
-        return 1;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family   = AF_UNSPEC;     
+    hints.ai_socktype = SOCK_STREAM;   /* TCP (antes era SOCK_DGRAM) */
+    hints.ai_flags    = AI_PASSIVE;    
+
+    s = getaddrinfo(NULL, puerto, &hints, &result);
+    if (s != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+        return -1;
     }
 
-    memset (&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    error = getaddrinfo(NULL, AI_PASSIVE, &hints, &res0);
-    if (error){
-        errx(1, "%s", gai_strerror(error));
-    }
-    s=-1;
-    for (res = res0; res; res= res->ai_next){
-        s =socket(res -> ai_family, res->ai_socktype, res -> ai_protocol);
-        if(s<0){
-            cause="socket";
+    for (rp = result; rp != NULL; rp = rp->ai_next) {
+        sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (sfd == -1)
             continue;
-        }
-        if(connect(s, res->ai_addr, res->ai_addrlen)<0){
-            cause="connect";
-            close(s);
-            s = -1;
-            continue;
-        }
-        break;
+
+        setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+        if (bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+            break;                     
+
+        close(sfd);
     }
-if (s<0){
-    err(1,"%s", cause);
+    freeaddrinfo(result);
+
+    if (rp == NULL) {
+        fprintf(stderr, "No se pudo hacer bind en el puerto %s\n", puerto);
+        return -1;
+    }
+
+    if (listen(sfd, BACKLOG) == -1) {  
+        perror("listen");
+        close(sfd);
+        return -1;
+    }
+    return sfd;
 }
-freeaddrinfo(res0);
+
+int main(int argc, char *argv[])
+{
+    if (argc != 2) {
+        fprintf(stderr, "Uso: %s puerto\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    int sfd = crear_socket_escucha(argv[1]);
+    if (sfd == -1)
+        return EXIT_FAILURE;
+
+    printf("Escuchando en el puerto %s...\n", argv[1]);
+
+    for (;;) {
+        struct sockaddr_storage peer_addr;
+        socklen_t peer_addrlen = sizeof(peer_addr);
+        char host[NI_MAXHOST], service[NI_MAXSERV];
+        char buf[BUF_SIZE];
+
+        int cfd = accept(sfd, (struct sockaddr *)&peer_addr, &peer_addrlen);
+        if (cfd == -1) {
+            perror("accept");
+            continue;
+        }
+
+        if (getnameinfo((struct sockaddr *)&peer_addr, peer_addrlen,
+                        host, NI_MAXHOST, service, NI_MAXSERV,
+                        NI_NUMERICHOST | NI_NUMERICSERV) == 0)
+            printf("Cliente conectado: %s:%s\n", host, service);
+
+        ssize_t nread = recv(cfd, buf, sizeof(buf) - 1, 0);
+        if (nread > 0) {
+            buf[nread] = '\0';
+            printf("--- Solicitud (%zd bytes) ---\n%s\n", nread, buf);
+
+            const char *body = "Camily Aldaz MiniHTTPd\n";
+            char resp[512];
+            int n = snprintf(resp, sizeof(resp),
+                             "HTTP/1.1 200 OK\r\n"
+                             "Content-Type: text/plain\r\n"
+                             "Content-Length: %zu\r\n"
+                             "Connection: close\r\n"
+                             "\r\n"
+                             "%s",
+                             strlen(body), body);
+            send(cfd, resp, (size_t)n, 0);   
+        }
+
+        close(cfd);                    
+    }
+
+    close(sfd);
+    return EXIT_SUCCESS;
 }
