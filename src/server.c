@@ -6,9 +6,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/epoll.h>
+#include <errno.h>
+#include <fcntl.h>
 
 #define BUF_SIZE 4096
 #define BACKLOG  128
+#define MAX_EVENTS 64
+
+static int set_nonblocking(int fd){
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1)
+    return -1;
+return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
 
 static int crear_socket_escucha(const char *puerto)
 {
@@ -50,21 +61,17 @@ static int crear_socket_escucha(const char *puerto)
         close(sfd);
         return -1;
     }
+
+    if(set_nonblocking(sfd)==-1){
+        perror("fcntl");
+        close(sfd);
+        return -1;
+    }
+
     return sfd;
 }
 
-int main(int argc, char *argv[])
-{
-    if (argc != 2) {
-        fprintf(stderr, "Uso: %s puerto\n", argv[0]);
-        return EXIT_FAILURE;
-    }
-
-    int sfd = crear_socket_escucha(argv[1]);
-    if (sfd == -1)
-        return EXIT_FAILURE;
-
-    printf("Escuchando en el puerto %s...\n", argv[1]);
+static void aceptar_clientes(int epfd, int sfd){
 
     for (;;) {
         struct sockaddr_storage peer_addr;
@@ -74,8 +81,12 @@ int main(int argc, char *argv[])
 
         int cfd = accept(sfd, (struct sockaddr *)&peer_addr, &peer_addrlen);
         if (cfd == -1) {
-            perror("accept");
+            if(errno == EAGAIN || errno == EWOULDBLOCK)
+            break;
+            if(errno == EINTR || errno == ECONNABORTED)
             continue;
+            perror("aceptado");
+            break;
         }
 
         if (getnameinfo((struct sockaddr *)&peer_addr, peer_addrlen,
@@ -83,27 +94,93 @@ int main(int argc, char *argv[])
                         NI_NUMERICHOST | NI_NUMERICSERV) == 0)
             printf("Cliente conectado: %s:%s\n", host, service);
 
-        ssize_t nread = recv(cfd, buf, sizeof(buf) - 1, 0);
-        if (nread > 0) {
-            buf[nread] = '\0';
-            printf("--- Solicitud (%zd bytes) ---\n%s\n", nread, buf);
-
-            const char *body = "Camily Aldaz MiniHTTPd\n";
-            char resp[512];
-            int n = snprintf(resp, sizeof(resp),
-                             "HTTP/1.1 200 OK\r\n"
-                             "Content-Type: text/plain\r\n"
-                             "Content-Length: %zu\r\n"
-                             "Connection: close\r\n"
-                             "\r\n"
-                             "%s",
-                             strlen(body), body);
-            send(cfd, resp, (size_t)n, 0);   
+        if(set_nonblocking(cfd)==-1){
+            close(cfd);
+            continue;
         }
-
-        close(cfd);                    
+        
+        struct epoll_event ev;
+        memset(&ev, 0, sizeof(ev));
+        ev.events=EPOLLIN;
+        ev.data.fd=cfd;
+        if(epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev)==-1){
+            perror("epoll_ctl= cliente");
+            close(cfd);
+        }                 
     }
+}
 
+static void atender_cliente(int cfd)
+{
+    char buf[BUF_SIZE];
+ 
+    ssize_t nread = recv(cfd, buf, sizeof(buf) - 1, 0);
+    if (nread < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+        return;                       
+ 
+    if (nread > 0) {
+        buf[nread] = '\0';
+        printf("Solicitud (%zd bytes)\n%s\n", nread, buf);
+ 
+        const char *body = "Camily Aldaz MiniHTTPd\n";
+        char resp[512];
+        int n = snprintf(resp, sizeof(resp),
+                         "HTTP/1.1 200 OK\r\n"
+                         "\r\n"
+                         "%s",body);
+                send(cfd, resp, (ssize_t)n, 0);
+    }
+ 
+    close(cfd);                        
+}
+ 
+int main(int argc, char *argv[])
+{
+    if (argc != 2) {
+        fprintf(stderr, "Uso: %s puerto\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+ 
+    int sfd = crear_socket_escucha(argv[1]);
+    if (sfd == -1)
+        return EXIT_FAILURE;
+ 
+    int epfd = epoll_create1(0);
+    if (epfd == -1) {
+        perror("epoll_create1");
+        return EXIT_FAILURE;
+    }
+ 
+    struct epoll_event ev;
+    memset(&ev, 0, sizeof(ev));
+    ev.events = EPOLLIN;
+    ev.data.fd = sfd;
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, sfd, &ev) == -1) {
+        perror("epoll_ctl: sfd");
+        return EXIT_FAILURE;
+    }
+ 
+    printf("Escuchando en el puerto %s...\n", argv[1]);
+    fflush(stdout);
+ 
+    struct epoll_event events[MAX_EVENTS];
+    for (;;) {
+        int nfds = epoll_wait(epfd, events, MAX_EVENTS, -1);
+        if (nfds == -1) {
+            if (errno == EINTR)
+                continue;
+            perror("epoll_wait");
+            break;
+        }
+        for (int i = 0; i < nfds; i++) {
+            if (events[i].data.fd == sfd)
+                aceptar_clientes(epfd, sfd);
+            else
+                atender_cliente(events[i].data.fd);
+        }
+    }
+ 
+    close(epfd);
     close(sfd);
     return EXIT_SUCCESS;
 }
