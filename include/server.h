@@ -3,12 +3,10 @@
 
 #define MAX_EVENTS 64    
 
+int  crear_socket_escucha(const char *puerto);
 
- * y lo deja no bloqueante. Devuelve el descriptor o -1 si falla. */
-int  server_listen(const char *port);
+void aceptar_clientes(int epfd, int sfd);
 
-void server_accept(int epfd, int listen_fd);
+void atender_cliente(int cfd);
 
-void server_handle_client(int fd);
-
-#endif
+#endif  
