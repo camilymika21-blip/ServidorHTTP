@@ -11,6 +11,7 @@
 #include <fcntl.h>
 
 #include <server.h>
+#include <http.h>
 
 #define BUF_SIZE 4096
 #define BACKLOG  128
@@ -79,7 +80,6 @@ void aceptar_clientes(int epfd, int sfd){
         struct sockaddr_storage peer_addr;
         socklen_t peer_addrlen = sizeof(peer_addr);
         char host[NI_MAXHOST], service[NI_MAXSERV];
-        char buf[BUF_SIZE];
 
         int cfd = accept(sfd, (struct sockaddr *)&peer_addr, &peer_addrlen);
         if (cfd == -1) {
@@ -122,7 +122,10 @@ void atender_cliente(int cfd)
  
     if (nread > 0) {
         buf[nread] = '\0';
-        printf("Solicitud (%zd bytes)\n%s\n", nread, buf);
+
+        request_t req;
+        int st = leer_solicitud(buf, &req);
+        printf("leer_solicitud -> %d |  %s %s %s\n", st, req.method, req.uri, req.version);
  
         const char *body = "Camily Aldaz MiniHTTPd\n";
         char resp[512];

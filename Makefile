@@ -5,7 +5,7 @@ OBJS = http.o server.o mime.o files.o main.o
 DEPS = http.h server.h mime.h files.h 
 SRCDIR = src
 INCDIR = include
-TARGET = minihttp
+TARGET = minihttpd
 SRCDEPS = $(addprefix $(INCDIR)/,$(DEPS))
 
 $(TARGET): $(OBJS)
