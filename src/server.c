@@ -125,15 +125,12 @@ void atender_cliente(int cfd)
 
         request_t req;
         int st = leer_solicitud(buf, &req);
-        printf("leer_solicitud -> %d |  %s %s %s\n", st, req.method, req.uri, req.version);
- 
-        const char *body = "Camily Aldaz MiniHTTPd\n";
-        char resp[512];
-        int n = snprintf(resp, sizeof(resp),
-                         "HTTP/1.1 200 OK\r\n"
-                         "\r\n"
-                         "%s",body);
-                send(cfd, resp, (ssize_t)n, 0);
+
+        if(st !=200)
+            enviar_respuesta(cfd, st, "text/plain", texto_estado(st));
+        else
+            enviar_respuesta(cfd, 200, "text/plain", "Camily Aldaz");
+
     }
  
     close(cfd);                        

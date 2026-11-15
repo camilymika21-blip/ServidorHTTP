@@ -11,6 +11,9 @@ typedef struct {
 } request_t;
 
 int leer_solicitud(const char *buf, request_t *req);
+void enviar_respuesta(int cfd, int codigo, const char *tipo, const char *cuerpo);
+
+const char *texto_estado(int codigo);
 
 #endif
 
