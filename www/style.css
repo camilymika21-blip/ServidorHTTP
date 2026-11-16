@@ -1,0 +1,13 @@
+body{
+    margin: 0;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+.encabezado{
+    margin: 20%;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+}
+
+.margen-principal{
+    max-width: 200px;
+}
