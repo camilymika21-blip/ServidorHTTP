@@ -6,12 +6,18 @@
 #include <sys/epoll.h>
 
 #include <server.h>
+#include <files.h>
 
 
 int main(int argc, char *argv[])
 {
     if (argc != 2) {
         fprintf(stderr, "Uso: %s puerto\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    if(iniciar_raiz("www")==-1){
+        fprintf(stderr,"No existe la carpeta www");
         return EXIT_FAILURE;
     }
  

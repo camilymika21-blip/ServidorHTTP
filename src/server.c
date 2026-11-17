@@ -12,6 +12,7 @@
 
 #include <server.h>
 #include <http.h>
+#include <files.h>
 
 #define BUF_SIZE 4096
 #define BACKLOG  128
@@ -126,11 +127,18 @@ void atender_cliente(int cfd)
         request_t req;
         int st = leer_solicitud(buf, &req);
 
-        if(st !=200)
+        if(st !=200){
             enviar_respuesta(cfd, st, "text/plain", texto_estado(st));
-        else
-            enviar_respuesta(cfd, 200, "text/plain", "Camily Aldaz");
-
+        }else{
+            off_t tam;
+            int fd = abrir_archivo(req.uri, &tam);
+            if(fd<0){
+            enviar_respuesta(cfd, -fd, "text/plain", texto_estado(-fd));
+             } else {
+            enviar_respuesta(cfd, 200, "text/plain", "Archivo encontrado");
+            close (fd);
+            }
+        }
     }
  
     close(cfd);                        

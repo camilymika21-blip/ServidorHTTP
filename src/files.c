@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include "files.h"
 
@@ -11,7 +12,7 @@ static char raiz[PATH_MAX];
 static size_t raiz_len;
 
 int iniciar_raiz(const char *carpeta){
-    if(realpath(carpeta, raiz)== raiz)
+    if(realpath(carpeta, raiz)== NULL)
     return -1;
     raiz_len = strlen(raiz);
     return 0;
@@ -27,11 +28,11 @@ int abrir_archivo(const char *ruta, off_t *tamano){
         return -400;
 
     if (realpath(completa, real) == NULL)
-        return ____;
+        return -404;
 
-    if (strncmp(real, raiz, raiz_len) != ____ ||
+    if (strncmp(real, raiz, raiz_len) != 0 ||
         (real[raiz_len] != '/' && real[raiz_len] != '\0'))
-        return ____;
+        return -403; 
 
     int fd = open(real, O_RDONLY);
     if (fd < 0)
