@@ -14,6 +14,8 @@ int leer_solicitud(const char *buf, request_t *req);
 void enviar_respuesta(int cfd, int codigo, const char *tipo, const char *cuerpo);
 
 const char *texto_estado(int codigo);
+const char *tipo_mime(const char *ruta);
+void enviar_archivo(int cfd, int fd, off_t tam, const char *tipo);
 
 #endif
 

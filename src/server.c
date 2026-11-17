@@ -10,9 +10,10 @@
 #include <errno.h>
 #include <fcntl.h>
 
-#include <server.h>
-#include <http.h>
-#include <files.h>
+#include "server.h"
+#include "http.h"
+#include "files.h"
+#include "mime.h"
 
 #define BUF_SIZE 4096
 #define BACKLOG  128
@@ -135,7 +136,7 @@ void atender_cliente(int cfd)
             if(fd<0){
             enviar_respuesta(cfd, -fd, "text/plain", texto_estado(-fd));
              } else {
-            enviar_respuesta(cfd, 200, "text/plain", "Archivo encontrado");
+            enviar_archivo(cfd, fd, tam, tipo_mime(req.uri));
             close (fd);
             }
         }

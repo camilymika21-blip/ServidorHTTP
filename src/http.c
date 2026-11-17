@@ -2,8 +2,11 @@
 #include <string.h>
 #include "http.h"
 #include <sys/socket.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
 
-#include <server.h>
+#include "server.h"
 
 int leer_solicitud(const char *buf, request_t *req){
     if(sscanf(buf, "%7s %1023s %15s", req->method, req->uri, req->version) != 3)
@@ -50,4 +53,34 @@ void enviar_respuesta(int cfd, int codigo, const char *tipo, const char *cuerpo)
 
         if( n > 0 && (size_t)n< sizeof(resp))
         send(cfd, resp, (size_t)n, 0);
+}
+
+void enviar_archivo(int cfd, int fd, off_t tam, const char *tipo){
+
+int flags = fcntl(cfd, F_GETFL, 0);
+    fcntl(cfd, F_SETFL, flags & ~O_NONBLOCK);
+
+    char cab[512];
+    int n = snprintf(cab, sizeof(cab),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %lld\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        tipo, (long long)tam);
+    if (n <= 0 || (size_t)n >= sizeof(cab))
+        return;
+    send(cfd, cab, (size_t)n, 0);
+
+    char buf[4096];
+    ssize_t leidos;
+    while ((leidos = read(fd, buf, sizeof(buf))) > 0) {
+        ssize_t enviados = 0;
+        while (enviados < leidos) {
+            ssize_t r = send(cfd, buf + enviados, leidos - enviados, 0);
+            if (r <= 0)
+                return;
+            enviados += r;
+        }
+    }
 }
