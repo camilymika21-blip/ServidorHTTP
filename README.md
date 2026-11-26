@@ -1,10 +1,10 @@
-# MiniHTTPd
+MiniHTTPd
 
 Servidor básico escrito en C para linux, sirve archivos estáticos (HTML,CSS e imágenes) y atiende a varios clientes a la vez con un solo hilo usando epoll y sockets no bloqueantes
 
 Proyecto para la materia de Computación Distribuida 2026-B
 
-## Características
+Características
 
 - Sirve archivos estáticos desde la capeta www/
 - Procesa el método get y analiza la línea de sollicitud (Método, URI y versión)
@@ -13,9 +13,8 @@ Proyecto para la materia de Computación Distribuida 2026-B
 - Responde con códigos de estado 200, 400, 403, 404, 405 y 500
 - Cierra la conexión despues de cada respuesta (close())
 
-## Estructura
+Estructura
 
-```
 minihttpd/
 ├── Makefile
 ├── README.md
@@ -34,37 +33,15 @@ minihttpd/
     ├── index.html
     ├── style.css
     └── Logoepn.png
-```
 
-## Compilación
+Compilación
 
 Requiere gcc y make en linux
 
 Makefile incluido contiene todo lo necesario para compilar el proyecto con un solo comando make
+Pruebas
 
-## Pruebas
-
-```bash
-# Página principal (200, text/html)
-curl -i http://127.0.0.1:8080/
-
-# Hoja de estilos (200, text/css)
-curl -i http://127.0.0.1:8080/style.css
-
-# Imagen (200, image/png); se descarta el cuerpo y se muestran las cabeceras
-curl -i http://127.0.0.1:8080/image.png --output /dev/null -D -
-
-# Archivo inexistente (404)
-curl -i http://127.0.0.1:8080/no-existe.html
-
-# Método no permitido (405)
-curl -i -X POST http://127.0.0.1:8080/
-
-# Intento de directory traversal (403 o 404, nunca el archivo del sistema)
-curl -i --path-as-is http://127.0.0.1:8080/../../etc/passwd
-```
-
-## Tipos de MIME
+Tipos de MIME
 
 | Extensión | Content-Type |
 |---|---|
@@ -73,13 +50,13 @@ curl -i --path-as-is http://127.0.0.1:8080/../../etc/passwd
 | .png | image/png |
 | otras | application/octet-stream |
 
-## Seguridad
+Seguridad
 
 - Directory traversal la ruta pedida se resuelve con realpath() y se verifica que quede dentro de la raiz www/ de lo contrario se responde 404
 - Métodos Inválidos todo método distinto de GET se rechaza con 405
 - Solicitadas malformadas se rechaza con 400
 
-## Diseño
+Diseño
 
 El servidor funciona con un solo hilo
 
