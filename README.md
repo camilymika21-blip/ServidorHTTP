@@ -64,7 +64,7 @@ El servidor funciona con un solo hilo
 2. Se registra en una lista epoll
 3. El bucle principalespera eventos con epoll_wait si el socket esta listo es el de escucha, se acepta todos los clientes pendientes y se registra en epoll, si es el de un cliente se lee su solcitud se responde y se cierra la conexión
 
-## Limitaciones
+Limitaciones
 
 - No soporta conexiones persistenres cada respuesta usa close()
 - Solo implementa el método GET
